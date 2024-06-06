@@ -1,0 +1,11 @@
+.bsp
+.metals
+.scala-build
+.vscode
+.envrc
+
+scala-today.db
+logs/
+*.log
+
+app/main

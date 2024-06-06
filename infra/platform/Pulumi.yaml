@@ -1,0 +1,5 @@
+name: scala.today
+runtime: scala
+description: Scala.today app deployment
+config:
+    pulumi:disable-default-providers: ["kubernetes"]

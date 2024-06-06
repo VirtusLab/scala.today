@@ -1,0 +1,5 @@
+encryptionsalt: v1:qc5onnAPQ/A=:v1:QbqCtN/GqIksY3P6:wlxi/qot5ln/sCPoIV208dcaari6Eg==
+config:
+  scala.today-platform:cloudflare_token:
+    secure: v1:xUEi50+GcY+S5uFh:N0ChhUf+XR3uQE6VAaeFRT2S0kLcqyNEbRVYLAzJpkKIzuZFf7e0KOUi/iIhI9QaQaL7JYqIfb8=
+  scala.today-platform:cloudflare_zone_id: 128b0e1ddc400823447c50d25324b0cd

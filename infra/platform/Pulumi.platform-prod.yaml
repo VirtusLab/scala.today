@@ -1,0 +1,8 @@
+encryptionsalt: v1:7k3+4uo5Ifs=:v1:yLDlndJ3vOqUtl9G:Uy89RwBv6ATe3S8S9jOyeIrKJ+vYFw==
+config:
+  scala.today:github_pull_token:
+    secure: v1:yD9XvxKEj9t97bWE:807eIpNvBKb0HcWyiwkw44Ztaz8CDhugo8bU5w7O3booP8iY2SLfSaMdQd0cDJ2LFI2xrw1tOzc=
+  scala.today:hetzner_token:
+    secure: v1:shBdA0C+2mHFGuas:kcg8uiAsgTKMvOkx7JEPu+JvLmN5a+TNgh2UTXlMuGvv+2voLHM715Ht8JeMyLmbkczSkGusUPuxoGvVQivDJL4y6uhcDW4iffnwGjbj8/M=
+  scala.today:ssh_private_key_path: /Users/lbialy-tv/.ssh/id_rsa
+  scala.today:ssh_public_key_path: /Users/lbialy-tv/.ssh/id_rsa.pub
