@@ -9,7 +9,7 @@
 //> using dep "com.softwaremill.sttp.tapir::tapir-files:1.10.8"
 
 // concurrency
-//> using dep "com.softwaremill.ox::core:0.2.0"
+//> using dep "com.softwaremill.ox::core:0.2.1"
 
 // logging
 //> using dep "com.outr::scribe:3.15.0"

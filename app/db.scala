@@ -163,7 +163,7 @@ object db:
               FROM $T 
               GROUP BY ${T.organization}, ${T.repository}
               ORDER BY latestReleaseDate DESC
-              OFFSET $page LIMIT $pageSize
+              OFFSET ${page * pageSize} LIMIT $pageSize
             ) rp
             JOIN $pwlr
             ON ${rp.organization} = ${pwlr.organization} AND ${rp.repository} = ${pwlr.repository}"""
