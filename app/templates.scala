@@ -51,7 +51,6 @@ object Templates:
 
   def pagingNavigation(pages: Vector[Int], activeIdx: Int, totalPages: Int, oob: Boolean = false) =
     val pagesWithChevrons = Vector(Int.MinValue) ++ pages ++ Vector(Int.MaxValue)
-    println(s"pagesWithChevrons: $pagesWithChevrons")
     nav(
       id := "pagination-nav",
       cls := "flex items-center space-x-2",
@@ -79,9 +78,6 @@ object Templates:
             )
 
         case (_, idx) if idx == pagesWithChevrons.size - 1 =>
-          println(pagesWithChevrons.lift(idx - 1))
-          println(activeIdx)
-          println(totalPages)
           // if there are more pages based on pagesWithChevron(idx - 1), show chevron with href=#
           if pagesWithChevrons.lift(idx - 1).exists(_ < totalPages + 1) && pages.nonEmpty && activeIdx != totalPages then
             a(

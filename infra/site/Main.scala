@@ -169,7 +169,7 @@ import besom.cfg.Struct
             spec = PodSpecArgs(
               containers = ConfiguredContainerArgs(
                 name = "app",
-                image = "ghcr.io/lbialy/scala.today:0.0.15",
+                image = "ghcr.io/lbialy/scala.today:0.0.16",
                 configuration = Struct(
                   jdbcUrl = jdbcUrl,
                   port = containerPort,
