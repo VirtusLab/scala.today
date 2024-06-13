@@ -2,8 +2,31 @@ package scala.today
 
 import scala.util.Try
 import ox.*
+import scala.concurrent.duration.*
+import com.augustnagro.magnum.Frag
 
 extension [A](expr: => A) def attempt: Either[Throwable, A] = Try(expr).toEither
+
+extension [A](expr: => A)
+  inline def as[B](b: B): B = b
+
+  def sleepAfter(duration: Duration)(using Ox): A =
+    val result = expr
+    Thread.sleep(duration.toMillis)
+    result
+
+extension [E <: Throwable, A](either: Either[E, A])
+  def discardError: Either[Unit, A] =
+    either.left.map(_ => ())
+  def logErrorDiscard(msg: String): Either[Unit, A] =
+    either.left.map(e => scribe.error(msg, e))
+  def logError(msg: String): Either[E, A] =
+    either.left.map(e => scribe.error(msg, e).as(e))
+
+extension (frag: Frag)
+  def logQuery: Frag =
+    scribe.info(frag.sqlString)
+    frag
 
 trait OxApp:
   def main(args: Array[String]): Unit =
@@ -24,25 +47,3 @@ extension (t: Throwable)
     val pw = new java.io.PrintWriter(sw)
     t.printStackTrace(pw)
     sw.toString
-
-import scala.compiletime.{error, summonFrom}
-import scala.util.boundary, boundary.Label, boundary.break
-
-extension [E, A](inline t: Either[E, A])
-  /** Unwrap the value of the `Either`, short-circuiting the computation to the enclosing [[either]], in case this is a left-value. */
-  transparent inline def ? =
-    summonFrom {
-      case given boundary.Label[Either[E, Nothing]] =>
-        // summonFrom {
-        //   case given boundary.Label[Either[Nothing, Nothing]] if given_Label_Either != summon[boundary.Label[Either[E, Nothing]]] =>
-        //     error(
-        //       "There are multiple enclosing `either` calls with different error types.\nMake sure you're using .? inside of a single, separate either: block."
-        //     )
-        // }
-        t match
-          case Left(e)  => break(Left(e))
-          case Right(a) => a
-      case given boundary.Label[Either[Nothing, Nothing]] =>
-        error("The enclosing `either` call uses a different error type.\nIf it's explicitly typed, is the error type correct?")
-      case _ => error("`.ok()` can only be used within an `either` call.\nIs it present?")
-    }: A

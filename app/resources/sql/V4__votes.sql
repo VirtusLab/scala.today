@@ -1,0 +1,4 @@
+CREATE TABLE votes(
+    projectId VARCHAR(1024) PRIMARY KEY NOT NULL,
+    voteCount INTEGER NOT NULL
+);

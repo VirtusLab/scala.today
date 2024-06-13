@@ -6,13 +6,19 @@ import scalatags.Text.svgTags.{attr => _, *}
 import scalatags.Text.svgAttrs.{width => svgWidth, height => svgHeight, fill => svgFill, viewBox => svgViewBox, d}
 import scala.today.db.ProjectWithLatestRelease
 import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+
 import AlpineAttributes.*
 import HtmxAttributes.*
 
 object Templates:
+
+  private val dtFormatter    = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'")
+  private val dtFormatterSec = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'")
+
   val pagingWindowSize = 3
 
-  def scope = attr("scope")
+  private def scope = attr("scope")
 
   def computePagesVector(activeIdx: Int, totalPages: Int, windowSize: Int = 5): Vector[Int] =
     val halfOfW           = windowSize / 2
@@ -54,48 +60,32 @@ object Templates:
     nav(
       id := "pagination-nav",
       cls := "flex items-center space-x-2",
-      hxOobSwap(oob),
+      hxOobSwap := oob,
       // generate pages with active page based on the activeIdx
       pagesWithChevrons.zipWithIndex.map {
         case (_, idx) if idx == 0 =>
-          // if we're on the first page, show chevron with href=#
-          if pagesWithChevrons.lift(idx + 1).exists(_ > 0) && pages.nonEmpty && activeIdx != 1 then
-            a(
-              cls := "text-gray-400 hover:text-red-600 p-4 inline-flex items-center gap-2 font-medium rounded-md",
-              span(attr("aria-hidden") := "true", "«"),
-              span(cls := "sr-only", "Previous"),
-              href := s"/?page=${pagesWithChevrons(idx + 1)}",
-              hxPushUrl(s"/?page=${pagesWithChevrons(idx + 1)}"),
-              hxTarget("#projects-table"),
-              hxTrigger("click"),
-              hxGet(s"/paging?page=${pagesWithChevrons(idx + 1)}")
-            )
-          else
-            span(
-              cls := "text-gray-400 p-4 inline-flex items-center gap-2 font-medium rounded-md",
-              span(attr("aria-hidden") := "true", "«"),
-              span(cls := "sr-only", "Previous")
-            )
+          a(
+            cls := "text-gray-400 hover:text-red-600 p-4 inline-flex items-center gap-2 font-medium rounded-md",
+            span(attr("aria-hidden") := "true", "«"),
+            span(cls := "sr-only", "Previous"),
+            href := s"/?page=1",
+            hxPushUrl := s"/?page=1",
+            hxTarget := "#projects-table",
+            hxTrigger := "click",
+            hxGet := s"/paging?page=1"
+          )
 
         case (_, idx) if idx == pagesWithChevrons.size - 1 =>
-          // if there are more pages based on pagesWithChevron(idx - 1), show chevron with href=#
-          if pagesWithChevrons.lift(idx - 1).exists(_ < totalPages + 1) && pages.nonEmpty && activeIdx != totalPages then
-            a(
-              cls := "text-gray-400 hover:text-red-600 p-4 inline-flex items-center gap-2 font-medium rounded-md",
-              span(attr("aria-hidden") := "true", "»"),
-              span(cls := "sr-only", "Next"),
-              href := s"/?page=${pagesWithChevrons(idx - 1)}",
-              hxPushUrl(s"/?page=${pagesWithChevrons(idx - 1)}"),
-              hxTarget("#projects-table"),
-              hxTrigger("click"),
-              hxGet(s"/paging?page=${pagesWithChevrons(idx - 1)}")
-            )
-          else
-            span(
-              cls := "text-gray-400 p-4 inline-flex items-center gap-2 font-medium rounded-md",
-              span(attr("aria-hidden") := "true", "»"),
-              span(cls := "sr-only", "Next")
-            )
+          a(
+            cls := "text-gray-400 hover:text-red-600 p-4 inline-flex items-center gap-2 font-medium rounded-md",
+            span(attr("aria-hidden") := "true", "»"),
+            span(cls := "sr-only", "Next"),
+            href := s"/?page=${totalPages}",
+            hxPushUrl := s"/?page=${totalPages}",
+            hxTarget := "#projects-table",
+            hxTrigger := "click",
+            hxGet := s"/paging?page=${totalPages}"
+          )
 
         case (page, idx) =>
           // for normal pages just render an anchor with the page number
@@ -104,20 +94,20 @@ object Templates:
               cls := "w-10 h-10 bg-red-500 text-white p-4 inline-flex items-center text-sm font-medium rounded-full",
               attr("aria-current") := "page",
               href := s"/?page=$page",
-              hxPushUrl(s"/?page=$page"),
-              hxTarget("#projects-table"),
-              hxGet(s"/paging?page=$page"),
-              hxTrigger("click"),
+              hxPushUrl := s"/?page=$page",
+              hxTarget := "#projects-table",
+              hxGet := s"/paging?page=$page",
+              hxTrigger := "click",
               page.toString
             )
           else
             a(
               cls := "w-10 h-10 text-gray-400 hover:text-red-600 p-4 inline-flex items-center text-sm font-medium rounded-full",
               href := s"/?page=$page",
-              hxPushUrl(s"/?page=$page"),
-              hxTarget("#projects-table"),
-              hxGet(s"/paging?page=$page"),
-              hxTrigger("click"),
+              hxPushUrl := s"/?page=$page",
+              hxTarget := "#projects-table",
+              hxGet := s"/paging?page=$page",
+              hxTrigger := "click",
               page.toString
             )
       }
@@ -132,16 +122,21 @@ object Templates:
         `@click`("open = !open"),
         td(
           cls := "px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200",
-          a(href := s"https://github.com/${project.project}", project.project)
+          a(`@click.stop`, href := s"https://github.com/${project.project}", project.project)
         ),
         td(cls := "px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200", project.latestVersion),
         td(
           cls := "px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200",
-          s"${project.latestReleaseDate.format(java.time.format.DateTimeFormatter.ISO_DATE_TIME)}"
+          s"${project.latestReleaseDate.format(dtFormatter)}"
         ),
         td(
           cls := "px-6 py-4 whitespace-nowrap text-right text-sm font-medium",
-          a(cls := "text-red-500 hover:text-red-700", href := "#", "It's blocking me!")
+          a(
+            `@click.stop`,
+            `:class`(s"wasVotedOn('${project.project}') ? 'text-gray-500 hover:text-gray-700' : 'text-red-500 hover:text-red-700'"),
+            "It's blocking me!",
+            `@click`(s"vote('${project.project}')")
+          )
         )
       ),
       tr(
@@ -173,7 +168,7 @@ object Templates:
                   td(cls := "px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200", artifact.artifactName),
                   td(
                     cls := "px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200",
-                    s"${artifact.releaseDate.format(java.time.format.DateTimeFormatter.ISO_DATE_TIME)}"
+                    s"${artifact.releaseDate.format(dtFormatterSec)}"
                   ),
                   td(cls := "px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200", artifact.licenses.sorted.mkString(", ")),
                   td(cls := "px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200", artifact.language.sorted.mkString(", ")),
@@ -188,6 +183,7 @@ object Templates:
 
   def projectsTable(projects: Vector[ProjectAndArtifacts]) =
     table(
+      `x-data`("voting()"),
       id := "projects-table",
       cls := "min-w-full divide-y divide-gray-200 dark:divide-gray-700",
       thead(
@@ -223,8 +219,8 @@ object Templates:
         div(
           cls := "container mx-auto p-4",
           div(
-            cls := "justify-center text-center mb-10 flex",
-            h1(cls := "text-6xl font-bold", "Scala.today"),
+            cls := "justify-center text-center mt-5 mb-10 flex",
+            h1(cls := "text-6xl font-bold", a(href := "/", "Scala.today")),
             img(src := "static/scala-transparent.png", width := "40", cls := "inline-flex ml-4")
           ),
           div(
@@ -241,8 +237,13 @@ object Templates:
                       cls := "relative max-w-xs justify-end",
                       label(`for` := "hs-table-with-pagination-search", cls := "sr-only", "Search"),
                       input(
-                        `type` := "text",
-                        name := "hs-table-with-pagination-search",
+                        `type` := "search",
+                        hxGet := "/search",
+                        hxTrigger := "keyup changed delay:500ms, search",
+                        hxTarget := "#projects-table",
+                        hxSync := "this:replace",
+                        hxPushUrl := true,
+                        name := "q",
                         id := "hs-table-with-pagination-search",
                         cls := "p-3 pl-10 block w-full border-gray-200 rounded-md text-sm focus:border-red-500 focus:ring-red-500 dark:bg-slate-900 dark:border-gray-700 dark:text-gray-400",
                         placeholder := "Search for items"
@@ -281,33 +282,7 @@ object Templates:
           src := "https://unpkg.com/htmx.org@1.9.12",
           integrity := "sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2",
           crossorigin := "anonymous"
-        )
+        ),
+        script(src := "static/voting.js")
       )
     )
-
-    // th(
-    //   scope := "col",
-    //   cls := "py-3 px-4 pr-0",
-    //   div(
-    //     cls := "flex items-center h-5",
-    //     input(
-    //       id := "hs-table-pagination-checkbox-all",
-    //       `type` := "checkbox",
-    //       cls := "border-gray-200 rounded text-red-600 focus:ring-red-500 dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-red-500 dark:checked:border-red-500 dark:focus:ring-offset-gray-800"
-    //     ),
-    //     label(`for` := "hs-table-pagination-checkbox-all", cls := "sr-only", "Checkbox")
-    //   )
-    // ),
-
-    // td(
-    //   cls := "py-3 pl-4",
-    //   div(
-    //     cls := "flex items-center h-5",
-    //     input(
-    //       id := "hs-table-pagination-checkbox-1",
-    //       `type` := "checkbox",
-    //       cls := "border-gray-200 rounded text-red-600 focus:ring-red-500 dark:bg-gray-800 dark:border-gray-700 dark:checked:bg-red-500 dark:checked:border-red-500 dark:focus:ring-offset-gray-800"
-    //     ),
-    //     label(`for` := "hs-table-pagination-checkbox-1", cls := "sr-only", "Checkbox")
-    //   )
-    // ),

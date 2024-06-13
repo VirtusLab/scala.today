@@ -40,7 +40,6 @@ object db:
   case class ProjectRow(@Id id: Int, organization: String, repository: String) derives DbCodec
 
   class ProjectRepo extends Repo[ProjectCreator, ProjectRow, Int]:
-    // TODO run() is unsafe, handle errors
     def upsert(pc: ProjectCreator)(using DbTx): Either[Throwable, ProjectRow] =
       sql"""INSERT INTO projects (organization, repository)
             VALUES (${pc.organization}, ${pc.repository}) 
@@ -49,9 +48,12 @@ object db:
           sql"SELECT * FROM projects WHERE organization = ${pc.organization} AND repository = ${pc.repository}"
             .query[ProjectRow]
             .run()
-            .headOption match
-            case None        => Left(Exception("Failed to find upserted project"))
-            case Some(value) => Right(value)
+            .attempt
+            .flatMap(ds =>
+              ds.headOption match
+                case None        => Left(Exception("Failed to find upserted project"))
+                case Some(value) => Right(value)
+            )
         case Some(value) => Right(value)
 
   case class ArtifactCreator(
@@ -84,7 +86,6 @@ object db:
   ) derives DbCodec
 
   class ArtifactRepo extends Repo[ArtifactCreator, ArtifactRow, Int]:
-    // TODO run() is unsafe, handle errors
     def upsert(ac: ArtifactCreator)(using DbTx): Either[Throwable, ArtifactRow] =
       sql"""INSERT INTO artifacts (groupId, artifactId, version, artifactName, project, projectFk, releaseDate, licenses, language, platform)
             VALUES (${ac.groupId}, ${ac.artifactId}, ${ac.version}, ${ac.artifactName}, ${ac.project}, ${ac.projectFk}, ${ac.releaseDate}, ${ac.licenses}, ${ac.language}, ${ac.platform})
@@ -93,9 +94,12 @@ object db:
           sql"SELECT * FROM artifacts WHERE groupId = ${ac.groupId} AND artifactId = ${ac.artifactId} AND version = ${ac.version}"
             .query[ArtifactRow]
             .run()
-            .headOption match
-            case None        => Left(Exception("Failed to find upserted artifact"))
-            case Some(value) => Right(value)
+            .attempt
+            .flatMap(ds =>
+              ds.headOption match
+                case None        => Left(Exception("Failed to find upserted artifact"))
+                case Some(value) => Right(value)
+            )
         case Some(value) => Right(value)
 
   @SqlName("projects_with_latest_release")
@@ -120,7 +124,6 @@ object db:
   class ProjectWithLatestReleaseRepo extends Repo[ProjectWithLatestRelease, ProjectWithLatestRelease, Int]:
     import ProjectWithLatestRelease.T
 
-    // TODO run() is unsafe, handle errors
     def upsert(p: ProjectWithLatestRelease)(using DbTx): Either[Throwable, ProjectWithLatestRelease] =
       sql"""INSERT INTO $T (${T.projectId}, ${T.organization}, ${T.repository}, ${T.groupId}, ${T.lastVersion}, ${T.artifactName}, ${T.project}, ${T.releaseDate}, ${T.licenses}, ${T.language}, ${T.platform})
             VALUES (${p.projectId}, ${p.organization}, ${p.repository}, ${p.groupId}, ${p.lastVersion}, ${p.artifactName}, ${p.project}, ${p.releaseDate}, ${p.licenses}, ${p.language}, ${p.platform})
@@ -138,9 +141,12 @@ object db:
           sql"SELECT * FROM $T WHERE ${T.organization} = ${p.organization} AND ${T.repository} = ${p.repository} AND ${T.artifactName} = ${p.artifactName}"
             .query[ProjectWithLatestRelease]
             .run()
-            .headOption match
-            case None        => Left(Exception("Failed to find upserted project with latest release"))
-            case Some(value) => Right(value)
+            .attempt
+            .flatMap(ds =>
+              ds.headOption match
+                case None        => Left(Exception("Failed to find upserted project with latest release"))
+                case Some(value) => Right(value)
+            )
         case Some(value) => Right(value)
 
     def getPageCountMainQuery(pageSize: Int)(using DbCon): Either[Throwable, Int] =
@@ -151,7 +157,53 @@ object db:
             ) AS t""".query[Int].run().headOption match
         case None                         => Left(Exception("Failed to get page count"))
         case Some(value) if pageSize == 0 => Right(0)
-        case Some(value)                  => Right(value / pageSize)
+        case Some(value) =>
+          if value % pageSize == 0 then Right(value / pageSize)
+          else Right(value / pageSize + 1)
+
+    def getPageCountQuery(query: String, pageSize: Int)(using DbCon): Either[Throwable, Int] =
+      val queryWithPcts = s"%$query%"
+      sql"""SELECT COUNT(*) AS count FROM (
+              SELECT ${T.organization}, ${T.repository}
+              FROM $T
+              WHERE ${T.organization} ILIKE $queryWithPcts
+                OR ${T.repository} ILIKE $queryWithPcts
+                OR ${T.groupId} ILIKE $queryWithPcts
+                OR ${T.artifactName} ILIKE $queryWithPcts
+                OR ${T.project} ILIKE $queryWithPcts
+              GROUP BY ${T.organization}, ${T.repository}
+          ) AS t""".query[Int].run().headOption match
+        case None                         => Left(Exception("Failed to get page count"))
+        case Some(value) if pageSize == 0 => Right(0)
+        case Some(value) =>
+          if value % pageSize == 0 then Right(value / pageSize)
+          else Right(value / pageSize + 1)
+
+    def getPageCountProjectQuery(org: String, project: String, pageSize: Int)(using DbCon): Either[Throwable, Int] =
+      sql"""SELECT COUNT(*) AS count FROM (
+              SELECT ${T.organization}, ${T.repository}
+              FROM $T
+              WHERE ${T.organization} = $org AND ${T.project} = $project
+              GROUP BY ${T.organization}, ${T.repository}
+          ) AS t""".query[Int].run().headOption match
+        case None                         => Left(Exception("Failed to get page count"))
+        case Some(value) if pageSize == 0 => Right(0)
+        case Some(value) =>
+          if value % pageSize == 0 then Right(value / pageSize)
+          else Right(value / pageSize + 1)
+
+    def getPageCountArtifactQuery(groupId: String, artifactName: String, pageSize: Int)(using DbCon): Either[Throwable, Int] =
+      sql"""SELECT COUNT(*) AS count FROM (
+              SELECT ${T.organization}, ${T.repository}
+              FROM $T
+              WHERE ${T.groupId} = $groupId AND ${T.artifactName} = $artifactName
+              GROUP BY ${T.organization}, ${T.repository}
+          ) AS t""".query[Int].run().headOption match
+        case None                         => Left(Exception("Failed to get page count"))
+        case Some(value) if pageSize == 0 => Right(0)
+        case Some(value) =>
+          if value % pageSize == 0 then Right(value / pageSize)
+          else Right(value / pageSize + 1)
 
     def fetchNRecentlyReleasedProjectsWithArtifacts(pageSize: Int, page: Int = 0)(using
       DbCon
@@ -171,7 +223,81 @@ object db:
         .run()
         .attempt
 
+    def searchForProject(org: String, project: String, pageSize: Int, page: Int = 0)(using
+      DbCon
+    ): Either[Throwable, Vector[(ProjectWithLatestRelease, OffsetDateTime)]] =
+      val pwlr = T.alias("pwlr")
+      val rp   = T.alias("rp")
+      sql"""SELECT ${pwlr.projectId}, ${pwlr.organization}, ${pwlr.repository}, ${pwlr.groupId}, ${pwlr.lastVersion}, ${pwlr.artifactName}, ${pwlr.project}, ${pwlr.releaseDate}, ${pwlr.licenses}, ${pwlr.language}, ${pwlr.platform}, rp.latestReleaseDate FROM (
+              SELECT ${T.organization}, ${T.repository}, max(${T.releaseDate}) AS latestReleaseDate
+              FROM $T
+              WHERE ${T.organization} = $org AND ${T.repository} = $project
+              GROUP BY ${T.organization}, ${T.repository}
+              ORDER BY latestReleaseDate DESC
+              OFFSET ${page * pageSize} LIMIT $pageSize
+            ) rp
+            JOIN $pwlr
+            ON ${rp.organization} = ${pwlr.organization} AND ${rp.repository} = ${pwlr.repository}"""
+        .query[(ProjectWithLatestRelease, OffsetDateTime)]
+        .run()
+        .attempt
+
+    def searchForArtifact(
+      groupId: String,
+      artifactName: String,
+      pageSize: Int,
+      page: Int = 0
+    )(using DbCon): Either[Throwable, Vector[(ProjectWithLatestRelease, OffsetDateTime)]] =
+      val pwlr = T.alias("pwlr")
+      val rp   = T.alias("rp")
+      sql"""SELECT ${pwlr.projectId}, ${pwlr.organization}, ${pwlr.repository}, ${pwlr.groupId}, ${pwlr.lastVersion}, ${pwlr.artifactName}, ${pwlr.project}, ${pwlr.releaseDate}, ${pwlr.licenses}, ${pwlr.language}, ${pwlr.platform}, rp.latestReleaseDate FROM (
+              SELECT ${T.organization}, ${T.repository}, max(${T.releaseDate}) AS latestReleaseDate
+              FROM $T
+              WHERE ${T.groupId} = $groupId AND ${T.artifactName} = $artifactName
+              GROUP BY ${T.organization}, ${T.repository}
+              ORDER BY latestReleaseDate DESC
+              OFFSET ${page * pageSize} LIMIT $pageSize
+            ) rp
+            JOIN $pwlr
+            ON ${rp.organization} = ${pwlr.organization} AND ${rp.repository} = ${pwlr.repository}"""
+        .query[(ProjectWithLatestRelease, OffsetDateTime)]
+        .run()
+        .attempt
+
+    def searchForProjectsWithArtifacts(
+      query: String,
+      pageSize: Int,
+      page: Int = 0
+    )(using DbCon): Either[Throwable, Vector[(ProjectWithLatestRelease, OffsetDateTime)]] =
+      val pwlr          = T.alias("pwlr")
+      val rp            = T.alias("rp")
+      val queryWithPcts = s"%$query%"
+      sql"""SELECT ${pwlr.projectId}, ${pwlr.organization}, ${pwlr.repository}, ${pwlr.groupId}, ${pwlr.lastVersion}, ${pwlr.artifactName}, ${pwlr.project}, ${pwlr.releaseDate}, ${pwlr.licenses}, ${pwlr.language}, ${pwlr.platform}, rp.latestReleaseDate FROM (
+              SELECT ${T.organization}, ${T.repository}, max(${T.releaseDate}) AS latestReleaseDate
+              FROM $T
+              WHERE ${T.organization} ILIKE $queryWithPcts 
+                OR ${T.repository} ILIKE $queryWithPcts
+                OR ${T.groupId} ILIKE $queryWithPcts
+                OR ${T.artifactName} ILIKE $queryWithPcts
+                OR ${T.project} ILIKE $queryWithPcts
+              GROUP BY ${T.organization}, ${T.repository}
+              ORDER BY latestReleaseDate DESC
+              OFFSET ${page * pageSize} LIMIT $pageSize
+            ) rp
+            JOIN $pwlr
+            ON ${rp.organization} = ${pwlr.organization} AND ${rp.repository} = ${pwlr.repository}"""
+        .query[(ProjectWithLatestRelease, OffsetDateTime)]
+        .run()
+        .attempt
+
   object RejectedArtifact:
     def store(msg: String, project: String, artifactName: String, version: String)(using DbCon): Either[Throwable, Unit] =
       sql"""INSERT INTO failed_main_view_artifacts (msg, project, artifactName, version)
             VALUES ($msg, $project, $artifactName, $version)""".update.run().attempt
+
+  object Votes:
+    def storeVote(projectId: String)(using DbCon): Either[Throwable, Unit] =
+      sql"""INSERT INTO votes (projectId,  voteCount)
+            VALUES ($projectId, 1)
+            ON CONFLICT (projectId)
+            DO UPDATE SET voteCount = votes.voteCount + 1""".update.run().attempt

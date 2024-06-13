@@ -3,8 +3,18 @@ package scala.today
 import ox.*
 import ox.either.*
 import besom.cfg.*
+import sttp.model.Uri
+import besom.cfg.internal.ConfiguredType
+import besom.cfg.internal.FieldType
 
-case class Config(port: Int, jdbcUrl: String, dbUser: String, dbPassword: String) derives Configured
+given uriFromEnv(using FromEnv[String]): FromEnv[Uri] with
+  def decode(env: Map[String, String], path: String): Option[Uri] =
+    summon[FromEnv[String]].decode(env, path).flatMap(Uri.parse(_).toOption)
+
+given ConfiguredType[Uri] with
+  def toFieldType: FieldType = FieldType.String
+
+case class Config(port: Int, jdbcUrl: String, dbUser: String, dbPassword: String, baseScaladexUrl: Uri) derives Configured
 
 object App extends OxApp:
 
@@ -25,5 +35,5 @@ object App extends OxApp:
         runScrapingOncePerDay(config)
 
     // start the http server
-    val http = Http(config, ds, repo)
+    val http = Http(config, ds, repo, Search(repo, Http.pageSize))
     http.serveForever

@@ -88,7 +88,7 @@ class Scraper(baseUrl: Uri):
 
 end Scraper
 
-def runScrapingOncePerDay(config: Config): Unit =
+def runScrapingOncePerDay(config: Config)(using Ox): Unit =
   import java.time.*, temporal.ChronoUnit
   val startTime = Instant.now()
 
@@ -108,8 +108,8 @@ def runScrapingOncePerDay(config: Config): Unit =
     scribe.info(s"Waiting for $durationToStart to start next scraping run...")
     Thread.sleep(timeToWait)
 
-def scrapingJob(config: Config): Unit =
-  catching(scrape(uri"https://index-dev.scala-lang.org", config.jdbcUrl)).flatten match
+def scrapingJob(config: Config)(using Ox): Unit =
+  catching(scrape(config.baseScaladexUrl, config.jdbcUrl)).flatten match
     case Left(err) =>
       scribe.error(s"Scraping failed", err)
     case Right(_) =>
@@ -117,7 +117,7 @@ def scrapingJob(config: Config): Unit =
 case class MainViewRejectionException(msg: String, project: String, artifactName: String, version: String, cause: Throwable)
     extends Exception(msg, cause)
 
-def scrape(scaladexApiUri: Uri, jdbcUrl: String): Either[Throwable, Unit] = either:
+def scrape(scaladexApiUri: Uri, jdbcUrl: String)(using Ox): Either[Throwable, Unit] = either:
   val scraper                      = Scraper(scaladexApiUri)
   val projectRepo                  = db.ProjectRepo()
   val artifactRepo                 = db.ArtifactRepo()
@@ -133,15 +133,15 @@ def scrape(scaladexApiUri: Uri, jdbcUrl: String): Either[Throwable, Unit] = eith
       projectRepo.upsert(db.ProjectCreator(project.organization, project.repository)).ok()
 
     val artifacts =
-      retryEither(RetryPolicy.backoff(3, 100.millis, 30.seconds, Jitter.Equal))(
-        scraper.fetchArtifactsForProject(project)
-      ).ok()
+      retryEither(RetryPolicy.backoff(3, 100.millis, 30.seconds, Jitter.Equal)) {
+        scraper.fetchArtifactsForProject(project).sleepAfter(300.millis) // TODO proper rate limiting
+      }.ok()
 
     val artifactInfos = artifacts.mapPar(20) { artifact =>
       val info =
-        retryEither(RetryPolicy.backoff(3, 100.millis, 30.seconds, Jitter.Equal))(
-          scraper.fetchArtifactInfo(artifact)
-        ).ok()
+        retryEither(RetryPolicy.backoff(3, 100.millis, 30.seconds, Jitter.Equal)) {
+          scraper.fetchArtifactInfo(artifact).sleepAfter(300.millis) // TODO proper rate limiting
+        }.ok()
 
       artifact -> info
     }
