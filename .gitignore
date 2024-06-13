@@ -9,3 +9,4 @@ logs/
 *.log
 
 app/main
+kubeconfig.conf
