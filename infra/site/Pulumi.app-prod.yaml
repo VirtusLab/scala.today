@@ -2,7 +2,9 @@ encryptionsalt: v1:rN6Kb7JKraw=:v1:nSedRI00Atx4qSim:IGpwL6/udXHSKATpExiMaYSVDkST
 config:
   scala.today:base_scaladex_url: https://index-dev.scala-lang.org
   scala.today:cloudflare_token:
-    secure: v1:1PC/fiFg3ThE4Wyu:sTZfFF25Jn9IeN6b3OXWFEVy0s7Clc/b4alNt5m2BE+MVRBI3PFSJUfdvPDoZj0wiJPExrxi3cw=
+    secure: v1:rFKu0f6gndAA87T0:r/YddP9cq7LCAFfAy15n9+yszV02ldvjGanaWda63iB5xMnvwg+LFAbbxBlUeJh9IzdGxDxoSv4=
   scala.today:cloudflare_zone_id: 128b0e1ddc400823447c50d25324b0cd
   scala.today:db_password: postgresml
   scala.today:db_user: postgresml
+  scala.today:ingress_host: scala.today
+  scala.today:namespace_suffix: ""

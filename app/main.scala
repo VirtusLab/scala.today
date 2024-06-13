@@ -14,7 +14,7 @@ given uriFromEnv(using FromEnv[String]): FromEnv[Uri] with
 given ConfiguredType[Uri] with
   def toFieldType: FieldType = FieldType.String
 
-case class Config(port: Int, jdbcUrl: String, dbUser: String, dbPassword: String, baseScaladexUrl: Uri) derives Configured
+case class Config(port: Int, jdbcUrl: String, dbUser: String, dbPassword: String, baseScaladexUrl: Uri, runScrapingJobs: Boolean) derives Configured
 
 object App extends OxApp:
 
@@ -30,9 +30,10 @@ object App extends OxApp:
     db.performMigrations(config.jdbcUrl, config.dbUser, config.dbPassword).ok()
 
     // fork the scraping job to run once per day
-    fork:
-      forever:
-        runScrapingOncePerDay(config)
+    if config.runScrapingJobs then
+      fork:
+        forever:
+          runScrapingOncePerDay(config)
 
     // start the http server
     val http = Http(config, ds, repo, Search(repo, Http.pageSize))

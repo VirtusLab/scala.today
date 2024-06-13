@@ -51,11 +51,14 @@ import besom.cfg.Struct
     )
   )
 
+  // has to be empty for prod
+  val namespaceSuffix = config.requireString("namespace_suffix")
+
   val appNamespace = Namespace(
     "app",
     NamespaceArgs(
       metadata = ObjectMetaArgs(
-        name = "app"
+        name = namespaceSuffix.map(suf => if suf.isEmpty then "app" else s"app-$suf")
       )
     ),
     opts(provider = k3sProvider, protect = true)
@@ -65,20 +68,20 @@ import besom.cfg.Struct
     "db",
     NamespaceArgs(
       metadata = ObjectMetaArgs(
-        name = "db"
+        name = namespaceSuffix.map(suf => if suf.isEmpty then "db" else s"db-$suf")
       )
     ),
     opts(provider = k3sProvider, protect = true)
   )
 
-  val dbLabels = Map("db" -> "postgresml")
-  val labels   = Map("app" -> "scala.today")
+  val dbLabels = namespaceSuffix.map(suf => Map((if suf.isEmpty then "db" else s"db-$suf") -> "postgresml"))
+  val labels   = namespaceSuffix.map(suf => Map((if suf.isEmpty then "app" else s"app-$suf") -> "scala.today"))
 
   val postgresPort  = 5432
   val dashboardPort = 8000
   val containerPort = 8080
   val servicePort   = 8080
-  val ingressHost   = "dev.scala.today"
+  val ingressHost   = config.requireString("ingress_host")
 
   val postgresmlStatefulSet = k8s.apps.v1.StatefulSet(
     "postgresml",
@@ -118,8 +121,26 @@ import besom.cfg.Struct
               ports = List(
                 ContainerPortArgs(name = "postgres", containerPort = postgresPort),
                 ContainerPortArgs(name = "dashboard", containerPort = dashboardPort)
+              ),
+              volumeMounts = List(
+                VolumeMountArgs(
+                  name = "postgresml-data",
+                  mountPath = "/var/lib/postgresql/data"
+                )
               )
             ) :: Nil
+          )
+        ),
+        volumeClaimTemplates = List(
+          PersistentVolumeClaimArgs(
+            metadata = ObjectMetaArgs(
+              name = "postgresml-data",
+              namespace = dbNamespace.metadata.name
+            ),
+            spec = PersistentVolumeClaimSpecArgs(
+              accessModes = List("ReadWriteOnce"),
+              resources = VolumeResourceRequirementsArgs(requests = Map("storage" -> "10Gi"))
+            )
           )
         )
       )
@@ -169,13 +190,14 @@ import besom.cfg.Struct
             spec = PodSpecArgs(
               containers = ConfiguredContainerArgs(
                 name = "app",
-                image = "ghcr.io/lbialy/scala.today:0.0.20",
+                image = "ghcr.io/lbialy/scala.today:0.0.21",
                 configuration = Struct(
                   jdbcUrl = jdbcUrl,
                   port = containerPort,
                   dbUser = config.requireString("db_user"),
                   dbPassword = config.requireString("db_password"),
-                  baseScaladexUrl = config.requireString("base_scaladex_url")
+                  baseScaladexUrl = config.requireString("base_scaladex_url"),
+                  runScrapingJobs = true
                 ),
                 ports = List(
                   ContainerPortArgs(name = "http", containerPort = containerPort)
